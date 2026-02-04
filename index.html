@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -9,7 +9,7 @@
     <div id="app"></div>
 
     <div class="hud" id="hud">
-      <div class="hud__title">Seat Ibiza 2022 (Three.js)</div>
+      <div class="hud__title">Seat Ibiza 2022 (Three.js) by Fathi</div>
       <div class="hud__subtitle">
         BIM-style inspection demo: select &bull; properties &bull; layers &bull; issues &bull; measure &bull; clip
       </div>
@@ -17,10 +17,13 @@
         <span id="loading">Loading model...</span>
       </div>
       <div class="hud__instruction" id="instruction">Navigate: orbit with drag, zoom with scroll.</div>
-      <button class="theme-toggle" id="theme-toggle" aria-pressed="false">
-        Light Mode
-        <span class="theme-indicator" aria-hidden="true"></span>
-      </button>
+      <div class="hud__actions">
+        <button class="theme-toggle" id="theme-toggle" aria-pressed="false">
+          Light Mode
+          <span class="theme-indicator" aria-hidden="true"></span>
+        </button>
+        <button class="reset-button" id="reset-app">Reset</button>
+      </div>
     </div>
 
     <aside class="panel" id="panel">
@@ -72,11 +75,24 @@
         <h3>Tools</h3>
         <div class="button-row">
           <button data-mode="navigate" class="is-active">Navigate</button>
+          <button data-mode="move">Move</button>
           <button data-mode="select">Select</button>
           <button data-mode="issue">Issue</button>
           <button data-mode="measure">Measure</button>
           <button data-mode="clip">Clip</button>
           <button id="model-rotate" class="ghost">Rotate Model</button>
+        </div>
+        <label class="field field--stack">
+          <span>Exploded view</span>
+          <input id="explode-slider" type="range" min="0" max="1" step="0.01" value="0" />
+          <span class="range-value" id="explode-value">0%</span>
+        </label>
+        <div class="button-row">
+          <button id="explode-reset" class="ghost">Reset</button>
+        </div>
+        <div class="field">
+          <span>LOD status</span>
+          <span id="lod-status">Loading...</span>
         </div>
       </section>
 
@@ -140,11 +156,11 @@
 
       <div class="panel__credit">
         <div>
-          Car model credit: Ddiaz Design —
+          Car model credit: Ddiaz Design -
           <a href="https://skfb.ly/ptVUo" target="_blank" rel="noreferrer noopener">https://skfb.ly/ptVUo</a>
         </div>
         <div>
-          Spotlight model credit: Mike Rowley —
+          Spotlight model credit: Mike Rowley -
           <a href="https://skfb.ly/M6TS" target="_blank" rel="noreferrer noopener">https://skfb.ly/M6TS</a>
         </div>
       </div>
@@ -153,3 +169,4 @@
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
+

@@ -6,7 +6,7 @@ const STORAGE_KEY = "seat-ibiza-layers";
 export class LayersTool {
   private meshes: THREE.Mesh[] = [];
   private meshCategory = new Map<THREE.Mesh, Category>();
-  private state: Record<Category, boolean> = {
+  private defaultState: Record<Category, boolean> = {
     Body: true,
     Glass: true,
     Wheels: true,
@@ -14,6 +14,7 @@ export class LayersTool {
     Lights: true,
     Other: true,
   };
+  private state: Record<Category, boolean> = { ...this.defaultState };
 
   setMeshes(meshes: THREE.Mesh[]) {
     this.meshes = meshes;
@@ -44,6 +45,12 @@ export class LayersTool {
 
   getState() {
     return { ...this.state };
+  }
+
+  reset() {
+    this.state = { ...this.defaultState };
+    this.applyVisibility();
+    this.persistState();
   }
 
   toggle(category: Category, visible: boolean) {

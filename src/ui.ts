@@ -2,7 +2,7 @@ import type { Category, SelectionInfo } from "./tools/selection";
 import type { Severity, IssueUI } from "./tools/issues";
 import type { ClipAxis } from "./tools/clipping";
 
-export type Mode = "navigate" | "select" | "issue" | "measure" | "clip";
+export type Mode = "navigate" | "move" | "select" | "issue" | "measure" | "clip";
 export type ViewPreset = "front" | "side" | "rear" | "top" | "interior" | "reset";
 
 export type IssueFormData = {
@@ -19,6 +19,7 @@ export class UI {
   private layerInputs: HTMLInputElement[];
   private rotateButton: HTMLButtonElement;
   private themeToggle: HTMLButtonElement;
+  private resetButton: HTMLButtonElement;
   private issueForm: HTMLDivElement;
   private issueTitle: HTMLInputElement;
   private issueSeverity: HTMLSelectElement;
@@ -33,6 +34,10 @@ export class UI {
   private trianglesValue: HTMLSpanElement;
   private lightStrengthInput: HTMLInputElement;
   private lightStrengthValue: HTMLSpanElement;
+  private explodeSlider: HTMLInputElement;
+  private explodeValue: HTMLSpanElement;
+  private explodeReset: HTMLButtonElement;
+  private lodStatus: HTMLSpanElement;
 
   onModeChange?: (mode: Mode) => void;
   onViewPreset?: (preset: ViewPreset) => void;
@@ -46,7 +51,10 @@ export class UI {
   onClipDisable?: () => void;
   onRotateToggle?: (enabled: boolean) => void;
   onThemeToggle?: (light: boolean) => void;
+  onResetApp?: () => void;
   onLightStrengthChange?: (value: number) => void;
+  onExplodeChange?: (value: number) => void;
+  onExplodeReset?: () => void;
 
   private issueFormCallbacks:
     | { onSave: (data: IssueFormData) => void; onCancel: () => void }
@@ -63,6 +71,7 @@ export class UI {
     );
     this.rotateButton = this.getEl("#model-rotate");
     this.themeToggle = this.getEl("#theme-toggle");
+    this.resetButton = this.getEl("#reset-app");
     this.layerInputs = Array.from(
       document.querySelectorAll<HTMLInputElement>("input[data-layer]")
     );
@@ -82,6 +91,10 @@ export class UI {
     this.trianglesValue = this.getEl("#triangles");
     this.lightStrengthInput = this.getEl("#light-strength");
     this.lightStrengthValue = this.getEl("#light-strength-value");
+    this.explodeSlider = this.getEl("#explode-slider");
+    this.explodeValue = this.getEl("#explode-value");
+    this.explodeReset = this.getEl("#explode-reset");
+    this.lodStatus = this.getEl("#lod-status");
 
     this.bindUI();
   }
@@ -243,6 +256,15 @@ export class UI {
     this.lightStrengthValue.textContent = `${value.toFixed(2)}x`;
   }
 
+  setExplodeValue(value: number) {
+    this.explodeSlider.value = value.toFixed(2);
+    this.explodeValue.textContent = `${Math.round(value * 100)}%`;
+  }
+
+  setLodStatus(text: string) {
+    this.lodStatus.textContent = text;
+  }
+
   private bindUI() {
     this.modeButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -270,6 +292,10 @@ export class UI {
     this.themeToggle.addEventListener("click", () => {
       const isLight = this.themeToggle.getAttribute("aria-pressed") === "true";
       this.onThemeToggle?.(!isLight);
+    });
+
+    this.resetButton.addEventListener("click", () => {
+      this.onResetApp?.();
     });
 
     this.layerInputs.forEach((input) => {
@@ -313,6 +339,16 @@ export class UI {
       const value = Number(this.lightStrengthInput.value);
       this.lightStrengthValue.textContent = `${value.toFixed(2)}x`;
       this.onLightStrengthChange?.(value);
+    });
+
+    this.explodeSlider.addEventListener("input", () => {
+      const value = Number(this.explodeSlider.value);
+      this.explodeValue.textContent = `${Math.round(value * 100)}%`;
+      this.onExplodeChange?.(value);
+    });
+
+    this.explodeReset.addEventListener("click", () => {
+      this.onExplodeReset?.();
     });
 
     this.getEl("#issue-save").addEventListener("click", () => {

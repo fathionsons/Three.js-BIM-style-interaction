@@ -101,8 +101,14 @@ canvas {
   color: var(--text-subtle);
 }
 
-.theme-toggle {
+.hud__actions {
   margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-toggle {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -125,6 +131,20 @@ canvas {
 
 body[data-theme="light"] .theme-toggle .theme-indicator {
   background: #2ebf6d;
+}
+
+.reset-button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.reset-button:hover {
+  background: var(--surface-hover);
 }
 
 .panel {
@@ -201,6 +221,11 @@ button.ghost {
   font-size: 0.72rem;
   color: var(--text-subtle);
   margin-top: 4px;
+}
+
+#lod-status {
+  color: var(--status);
+  font-weight: 600;
 }
 
 .field span:first-child {

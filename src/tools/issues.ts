@@ -34,7 +34,10 @@ export class IssuesTool {
   private pins = new Map<string, THREE.Mesh>();
   private draftPin: THREE.Mesh | null = null;
 
-  constructor(private scene: THREE.Scene, private renderer: THREE.WebGLRenderer) {
+  constructor(
+    private parent: THREE.Object3D,
+    private renderer: THREE.WebGLRenderer
+  ) {
     this.load();
   }
 
@@ -56,13 +59,13 @@ export class IssuesTool {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(point);
     mesh.castShadow = true;
-    this.scene.add(mesh);
+    this.parent.add(mesh);
     this.draftPin = mesh;
   }
 
   clearDraftPin() {
     if (this.draftPin) {
-      this.scene.remove(this.draftPin);
+      this.parent.remove(this.draftPin);
       this.draftPin.geometry.dispose();
       (this.draftPin.material as THREE.Material).dispose();
       this.draftPin = null;
@@ -131,7 +134,7 @@ export class IssuesTool {
     this.thumbnails = {};
     this.persist();
     this.pins.forEach((pin) => {
-      this.scene.remove(pin);
+      this.parent.remove(pin);
       pin.geometry.dispose();
       (pin.material as THREE.Material).dispose();
     });
@@ -148,7 +151,7 @@ export class IssuesTool {
     const pin = new THREE.Mesh(geometry, material);
     pin.position.set(issue.position.x, issue.position.y, issue.position.z);
     pin.castShadow = true;
-    this.scene.add(pin);
+    this.parent.add(pin);
     this.pins.set(issue.id, pin);
   }
 

@@ -9,6 +9,9 @@ import { LayersTool } from "./tools/layers";
 import { IssuesTool } from "./tools/issues";
 import { MeasureTool } from "./tools/measure";
 import { ClippingTool, type ClipAxis } from "./tools/clipping";
+import { LodTool } from "./tools/lod";
+import { ExplodeTool } from "./tools/explode";
+import { MoveTool } from "./tools/move";
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -24,6 +27,8 @@ const ui = new UI();
 
 const KEEP_PBR_TEXTURES = true;
 const FORCE_SMOOTH_NORMALS = true;
+const DEFAULT_STAGE_LIGHT_STRENGTH = 1.6;
+const DEFAULT_THEME_LIGHT = false;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -45,6 +50,11 @@ pmremGenerator.dispose();
 const textureLoader = new THREE.TextureLoader();
 const modelPivot = new THREE.Group();
 scene.add(modelPivot);
+// Keep LOD swaps isolated so we can replace the model without touching pins/tools.
+const modelContainer = new THREE.Group();
+modelPivot.add(modelContainer);
+const issuesAnchor = new THREE.Group();
+modelPivot.add(issuesAnchor);
 
 const camera = new THREE.PerspectiveCamera(
   50,
@@ -195,7 +205,7 @@ const stageLights: StageLight[] = [];
 const stageLightPickables: THREE.Object3D[] = [];
 let stageLightTemplate: THREE.Object3D | null = null;
 let stageLightsReady = false;
-let stageLightStrength = 1.6;
+let stageLightStrength = DEFAULT_STAGE_LIGHT_STRENGTH;
 let activeStageLight: StageLight | null = null;
 
 ui.setLightStrength(stageLightStrength);
@@ -261,11 +271,12 @@ const computeLightEmitter = (root: THREE.Object3D) => {
   const center = bounds.getCenter(new THREE.Vector3());
 
   if (lens) {
+    const lensObject = lens as THREE.Object3D;
     const lensWorld = new THREE.Vector3();
-    lens.getWorldPosition(lensWorld);
+    lensObject.getWorldPosition(lensWorld);
     const dir = lensWorld.clone().sub(center);
     if (dir.lengthSq() < 1e-6) {
-      lens.getWorldDirection(dir);
+      lensObject.getWorldDirection(dir);
     }
     if (dir.lengthSq() < 1e-6) {
       dir.set(0, 0, -1);
@@ -411,7 +422,7 @@ const setupStageLights = () => {
 
 const selectionTool = new SelectionTool();
 const layersTool = new LayersTool();
-const issuesTool = new IssuesTool(scene, renderer);
+const issuesTool = new IssuesTool(issuesAnchor, renderer);
 const measureTool = new MeasureTool(scene, (distance) => {
   if (distance === null) {
     ui.setMeasureValue("-");
@@ -420,6 +431,10 @@ const measureTool = new MeasureTool(scene, (distance) => {
   ui.setMeasureValue(`${distance.toFixed(2)} m (${distance.toFixed(2)} units)`);
 });
 const clippingTool = new ClippingTool(renderer);
+const explodeTool = new ExplodeTool();
+const moveTool = new MoveTool(camera, renderer.domElement);
+moveTool.setTarget(modelPivot);
+moveTool.setGroundHeight(0);
 
 let mode: Mode = "navigate";
 let modelBounds: THREE.Box3 | null = null;
@@ -432,6 +447,11 @@ let modelRoot: THREE.Object3D | null = null;
 let rotateEnabled = false;
 let logoAspect = 1;
 let modelReady = false;
+let explodeAmount = 0;
+let modelAlignment:
+  | { centerOffset: THREE.Vector3; pivotOffset: THREE.Vector3 }
+  | null = null;
+const modelPivotLast = new THREE.Vector3();
 let stageLightRigScale = 6;
 const stageLightTarget = new THREE.Vector3(0, 0.8, 0);
 const THEME_KEY = "seat-ibiza-theme";
@@ -526,8 +546,10 @@ const updateLogoSize = () => {
 const setMode = (nextMode: Mode) => {
   mode = nextMode;
   ui.setMode(nextMode);
+  const isMoveMode = nextMode === "move";
+  moveTool.setEnabled(isMoveMode && !rotateEnabled);
   renderer.domElement.style.cursor =
-    nextMode === "navigate" ? "grab" : "crosshair";
+    nextMode === "navigate" || isMoveMode ? "grab" : "crosshair";
 
   if (nextMode !== "clip") {
     clippingTool.disable();
@@ -535,6 +557,8 @@ const setMode = (nextMode: Mode) => {
 
   if (nextMode === "navigate") {
     ui.setInstruction("Navigate: orbit with drag, zoom with scroll.");
+  } else if (nextMode === "move") {
+    ui.setInstruction("Move: drag the car across the ground plane.");
   } else if (nextMode === "select") {
     ui.setInstruction("Select: click a mesh to inspect properties.");
   } else if (nextMode === "issue") {
@@ -566,6 +590,61 @@ const updateClipRange = (axis: ClipAxis) => {
   ui.setClipRange(min, max, value);
   clippingTool.setAxis(axis);
   clippingTool.setValue(value);
+};
+
+const resetAppState = () => {
+  localStorage.clear();
+
+  selectionTool.clear();
+  ui.setSelection(null);
+
+  issuesTool.clear();
+  ui.setIssues([]);
+
+  measureTool.clear();
+  ui.setMeasureValue("-");
+
+  explodeAmount = 0;
+  explodeTool.reset();
+  ui.setExplodeValue(0);
+
+  layersTool.reset();
+  ui.setLayerState(layersTool.getState());
+
+  clippingTool.disable();
+  updateClipRange("x");
+  ui.setClipAxis("x");
+
+  rotateEnabled = false;
+  ui.setRotateActive(false);
+  activeStageLight = null;
+  transformControls.detach();
+  transformControls.enabled = false;
+  transformHelper.visible = false;
+  setMode("navigate");
+  moveTool.cancel();
+  controls.enabled = true;
+
+  stageLightStrength = DEFAULT_STAGE_LIGHT_STRENGTH;
+  ui.setLightStrength(stageLightStrength);
+  stageLights.forEach((light) => setStageLightOn(light, true));
+
+  if (modelAlignment) {
+    modelPivot.position.copy(modelAlignment.pivotOffset);
+  } else {
+    modelPivot.position.set(0, 0, 0);
+  }
+  modelPivot.updateMatrixWorld(true);
+  stageLightRig.position.copy(modelPivot.position);
+  modelPivotLast.copy(modelPivot.position);
+
+  if (initialView) {
+    camera.position.copy(initialView.position);
+    controls.target.copy(initialView.target);
+    controls.update();
+  }
+
+  applyTheme(DEFAULT_THEME_LIGHT);
 };
 
 ui.onModeChange = (nextMode) => {
@@ -610,6 +689,9 @@ ui.onRotateToggle = (enabled) => {
   ui.setRotateActive(enabled);
   if (enabled) {
     activeStageLight = null;
+    if (mode === "move") {
+      setMode("navigate");
+    }
   }
   updateTransformTarget();
   if (enabled) {
@@ -623,9 +705,24 @@ ui.onThemeToggle = (light) => {
   applyTheme(light);
 };
 
+ui.onResetApp = () => {
+  resetAppState();
+};
+
 ui.onLightStrengthChange = (value) => {
   stageLightStrength = value;
   stageLights.forEach((light) => applyStageLightIntensity(light));
+};
+
+ui.onExplodeChange = (value) => {
+  explodeAmount = value;
+  explodeTool.setAmount(value);
+};
+
+ui.onExplodeReset = () => {
+  explodeAmount = 0;
+  explodeTool.reset();
+  ui.setExplodeValue(0);
 };
 
 ui.onLayerToggle = (category, visible) => {
@@ -750,7 +847,142 @@ const getFilteredMinY = (list: THREE.Mesh[], overall: THREE.Box3) => {
   return minY;
 };
 
+const applyModelAlignment = (root: THREE.Object3D, list: THREE.Mesh[]) => {
+  root.position.set(0, 0, 0);
+  if (modelAlignment) {
+    root.position.sub(modelAlignment.centerOffset);
+    modelPivot.position.copy(modelAlignment.pivotOffset);
+    modelPivot.updateMatrixWorld(true);
+    return;
+  }
+
+  // Compute and cache alignment once so proxy/high swaps do not shift the view.
+  modelPivot.position.set(0, 0, 0);
+  modelPivot.updateMatrixWorld(true);
+
+  let bounds = computeBounds(list);
+  bounds.getCenter(modelCenter);
+  const centerOffset = modelCenter.clone();
+  root.position.sub(centerOffset);
+  root.updateMatrixWorld(true);
+
+  bounds = computeBounds(list);
+  const minY = getFilteredMinY(list, bounds);
+  modelPivot.position.y = -minY;
+  modelPivot.updateMatrixWorld(true);
+
+  bounds = computeBounds(list);
+  const correctedMinY = getFilteredMinY(list, bounds);
+  if (Math.abs(correctedMinY) > 1e-4) {
+    modelPivot.position.y -= correctedMinY;
+    modelPivot.updateMatrixWorld(true);
+  }
+
+  modelAlignment = {
+    centerOffset,
+    pivotOffset: modelPivot.position.clone(),
+  };
+};
+
+const rebuildModelState = (
+  root: THREE.Object3D,
+  list: THREE.Mesh[],
+  stage: "proxy" | "high"
+) => {
+  modelRoot = modelPivot;
+  meshes = list;
+  totalTriangles = 0;
+
+  meshes.forEach((mesh) => {
+    mesh.castShadow = stage === "high";
+    mesh.receiveShadow = stage === "high";
+    if (Array.isArray(mesh.material)) {
+      mesh.material.forEach((mat) => sanitizeMaterial(mat));
+    } else if (mesh.material) {
+      sanitizeMaterial(mesh.material);
+    }
+
+    const geometry = mesh.geometry;
+    if (geometry) {
+      if (FORCE_SMOOTH_NORMALS) {
+        geometry.computeVertexNormals();
+        geometry.normalizeNormals();
+      }
+      if (geometry.index) {
+        totalTriangles += geometry.index.count / 3;
+      } else {
+        const position = geometry.getAttribute("position");
+        if (position) {
+          totalTriangles += position.count / 3;
+        }
+      }
+    }
+  });
+
+  applyModelAlignment(root, meshes);
+  modelPivot.updateMatrixWorld(true);
+
+  modelBounds = computeBounds(meshes);
+  modelBounds.getCenter(modelCenter);
+  modelBounds.getSize(modelSize);
+
+  updateLogoSize();
+
+  const maxDim = Math.max(modelSize.x, modelSize.y, modelSize.z);
+  stageLightRigScale = Math.max(2.2, maxDim * 1.1);
+  stageLightTarget.set(0, modelPivot.position.y + modelSize.y * 0.4, 0);
+  modelReady = true;
+  if (stageLightsReady) {
+    aimStageLights(stageLightTarget, stageLightRigScale);
+  }
+
+  if (!initialView) {
+    const fov = THREE.MathUtils.degToRad(camera.fov);
+    const distance = (maxDim / (2 * Math.tan(fov / 2))) * 1.6;
+    const viewDir = new THREE.Vector3(1, 0.6, 1).normalize();
+    camera.position.copy(viewDir.multiplyScalar(distance));
+    camera.near = Math.max(0.1, distance / 100);
+    camera.far = distance * 100;
+    camera.updateProjectionMatrix();
+
+    controls.target.set(0, modelSize.y * 0.2, 0);
+    controls.update();
+
+    initialView = {
+      position: camera.position.clone(),
+      target: controls.target.clone(),
+    };
+  }
+
+  updateTransformTarget();
+
+  layersTool.setMeshes(meshes);
+  const state = layersTool.loadState();
+  layersTool.applyVisibility();
+  ui.setLayerState(state);
+
+  clippingTool.setMeshes(meshes);
+  updateClipRange("x");
+  if (mode === "clip") {
+    clippingTool.enable();
+  }
+
+  explodeTool.setModel(root, meshes, modelBounds);
+  explodeTool.setAmount(explodeAmount);
+
+  moveTool.setPickables(meshes);
+
+  selectionTool.clear();
+  ui.setSelection(null);
+  ui.setIssues(issuesTool.getIssuesForUI());
+  ui.setPerformance(0, totalTriangles);
+};
+
 const updateTransformTarget = () => {
+  if (moveTool.isDragging()) {
+    controls.enabled = false;
+    return;
+  }
   const target = activeStageLight
     ? activeStageLight.group
     : rotateEnabled && modelRoot
@@ -828,11 +1060,34 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) {
     return;
   }
+  if (mode === "move") {
+    const started = moveTool.onPointerDown(event);
+    if (started) {
+      controls.enabled = false;
+    }
+    return;
+  }
   pointerDown = { x: event.clientX, y: event.clientY, time: Date.now() };
+});
+
+renderer.domElement.addEventListener("pointermove", (event) => {
+  if (transformControls.dragging) {
+    return;
+  }
+  if (mode === "move") {
+    moveTool.onPointerMove(event);
+  }
 });
 
 renderer.domElement.addEventListener("pointerup", (event) => {
   if (transformControls.dragging) {
+    return;
+  }
+  if (mode === "move") {
+    const ended = moveTool.onPointerUp();
+    if (ended) {
+      controls.enabled = true;
+    }
     return;
   }
   if (!pointerDown) {
@@ -904,11 +1159,19 @@ renderer.domElement.addEventListener("pointerup", (event) => {
   }
 });
 
-const loader = new GLTFLoader();
+renderer.domElement.addEventListener("pointerleave", () => {
+  if (mode === "move") {
+    moveTool.cancel();
+    controls.enabled = true;
+  }
+});
+
 const lightLoader = new GLTFLoader();
 const modelUrl = "/models/seat_ibiza_2022.glb";
+const proxyModelUrl = "/models/seat_ibiza_2022_proxy.glb";
 const lightModelUrl = "/models/stage_light_zoom_spot.glb";
-ui.setLoading("Loading model...");
+ui.setLoading("Loading preview...");
+ui.setLodStatus("Loading preview...");
 
 lightLoader.load(
   lightModelUrl,
@@ -935,119 +1198,40 @@ lightLoader.load(
   }
 );
 
-loader.load(
-  modelUrl,
-  (gltf: GLTF) => {
-    const model = gltf.scene;
-    modelRoot = modelPivot;
-    modelPivot.add(model);
-
-    meshes = [];
-    totalTriangles = 0;
-
-    model.traverse((child: THREE.Object3D) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        meshes.push(mesh);
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((mat) => sanitizeMaterial(mat));
-        } else if (mesh.material) {
-          sanitizeMaterial(mesh.material);
-        }
-
-        const geometry = mesh.geometry;
-        if (geometry) {
-          if (FORCE_SMOOTH_NORMALS) {
-            geometry.computeVertexNormals();
-            geometry.normalizeNormals();
-          }
-          if (geometry.index) {
-            totalTriangles += geometry.index.count / 3;
-          } else {
-            const position = geometry.getAttribute("position");
-            if (position) {
-              totalTriangles += position.count / 3;
-            }
-          }
-        }
+// Progressive LOD: proxy first, then high detail once the browser is idle.
+const lodTool = new LodTool(
+  {
+    highUrl: modelUrl,
+    proxyUrl: proxyModelUrl,
+    modelPivot: modelContainer,
+    hideInteriorOnProxy: true,
+    fadeDurationMs: 800,
+    idleDelayMs: 1400,
+  },
+  {
+    onProxyShown: (root, list) => {
+      rebuildModelState(root, list, "proxy");
+      ui.setLoading("Low-detail preview loaded");
+      ui.setLodStatus("Proxy loaded");
+    },
+    onHighShown: (root, list) => {
+      rebuildModelState(root, list, "high");
+      ui.setLoading("High-detail model loaded");
+      ui.setLodStatus("High-detail loaded");
+    },
+    onStatus: (status) => {
+      ui.setLoading(status);
+    },
+    onProgress: (value) => {
+      if (value === null) {
+        ui.setLoading("Loading high-detail model...");
+        return;
       }
-    });
-
-    modelBounds = computeBounds(meshes);
-    modelBounds.getCenter(modelCenter);
-    modelBounds.getSize(modelSize);
-
-    model.position.sub(modelCenter);
-    model.updateMatrixWorld(true);
-
-    modelBounds = computeBounds(meshes);
-    const minY = getFilteredMinY(meshes, modelBounds);
-    modelPivot.position.y = -minY;
-    modelPivot.updateMatrixWorld(true);
-
-    modelBounds = computeBounds(meshes);
-    const correctedMinY = getFilteredMinY(meshes, modelBounds);
-    if (Math.abs(correctedMinY) > 1e-4) {
-      modelPivot.position.y -= correctedMinY;
-      modelPivot.updateMatrixWorld(true);
-      modelBounds = computeBounds(meshes);
-    }
-    modelBounds.getCenter(modelCenter);
-    modelBounds.getSize(modelSize);
-
-    updateLogoSize();
-
-    const maxDim = Math.max(modelSize.x, modelSize.y, modelSize.z);
-    stageLightRigScale = Math.max(2.2, maxDim * 1.1);
-    stageLightTarget.set(0, modelPivot.position.y + modelSize.y * 0.4, 0);
-    modelReady = true;
-    if (stageLightsReady) {
-      aimStageLights(stageLightTarget, stageLightRigScale);
-    }
-    const fov = THREE.MathUtils.degToRad(camera.fov);
-    const distance = (maxDim / (2 * Math.tan(fov / 2))) * 1.6;
-    const viewDir = new THREE.Vector3(1, 0.6, 1).normalize();
-    camera.position.copy(viewDir.multiplyScalar(distance));
-    camera.near = Math.max(0.1, distance / 100);
-    camera.far = distance * 100;
-    camera.updateProjectionMatrix();
-
-    controls.target.set(0, modelSize.y * 0.2, 0);
-    controls.update();
-
-    initialView = {
-      position: camera.position.clone(),
-      target: controls.target.clone(),
-    };
-
-    updateTransformTarget();
-
-    layersTool.setMeshes(meshes);
-    const state = layersTool.loadState();
-    layersTool.applyVisibility();
-    ui.setLayerState(state);
-
-    clippingTool.setMeshes(meshes);
-    updateClipRange("x");
-
-    ui.setIssues(issuesTool.getIssuesForUI());
-    ui.setPerformance(0, totalTriangles);
-    ui.setLoading("Loaded OK");
-  },
-  (event: ProgressEvent<EventTarget>) => {
-    if (event.total && event.total > 0) {
-      const percent = (event.loaded / event.total) * 100;
-      ui.setLoading(`Loading model... ${percent.toFixed(0)}%`);
-    } else {
-      ui.setLoading("Loading model...");
-    }
-  },
-  () => {
-    ui.setLoading("Failed to load model (check /public/models/seat_ibiza_2022.glb)");
+      ui.setLoading(`Loading high-detail model... ${value.toFixed(0)}%`);
+    },
   }
 );
+lodTool.load();
 
 const onResize = () => {
   const width = window.innerWidth;
@@ -1068,6 +1252,12 @@ const tick = () => {
   requestAnimationFrame(tick);
   updateTransformTarget();
   controls.update();
+  if (modelReady) {
+    if (!modelPivotLast.equals(modelPivot.position)) {
+      stageLightRig.position.copy(modelPivot.position);
+      modelPivotLast.copy(modelPivot.position);
+    }
+  }
   stageLights.forEach((light) => {
     light.spot.target.updateMatrixWorld();
   });
@@ -1091,6 +1281,7 @@ setMode("navigate");
 ui.setRotateActive(false);
 ui.setSelection(null);
 ui.setMeasureValue("-");
+ui.setExplodeValue(0);
 ui.setIssues(issuesTool.getIssuesForUI());
 
 if (prefersReducedMotion) {
@@ -1098,6 +1289,6 @@ if (prefersReducedMotion) {
 }
 
 const storedTheme = localStorage.getItem(THEME_KEY);
-applyTheme(storedTheme ? storedTheme === "light" : false);
+applyTheme(storedTheme ? storedTheme === "light" : DEFAULT_THEME_LIGHT);
 
 tick();

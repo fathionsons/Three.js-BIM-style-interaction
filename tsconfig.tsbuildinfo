@@ -1,1 +1,1 @@
-{"root":["./src/main.ts","./src/ui.ts","./src/vite-env.d.ts","./src/tools/clipping.ts","./src/tools/issues.ts","./src/tools/layers.ts","./src/tools/measure.ts","./src/tools/selection.ts"],"version":"5.9.3"}
+{"root":["./src/main.ts","./src/ui.ts","./src/vite-env.d.ts","./src/tools/clipping.ts","./src/tools/explode.ts","./src/tools/issues.ts","./src/tools/layers.ts","./src/tools/lod.ts","./src/tools/measure.ts","./src/tools/move.ts","./src/tools/selection.ts"],"version":"5.9.3"}
