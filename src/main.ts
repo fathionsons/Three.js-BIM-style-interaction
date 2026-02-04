@@ -25,7 +25,10 @@ const prefersReducedMotion = window.matchMedia(
 
 const ui = new UI();
 
-const KEEP_PBR_TEXTURES = true;
+// Leave one texture unit headroom (target 15/16) on lower-end GPUs.
+let keepPbrTextures = true;
+const TARGET_TEXTURE_UNIT_BUDGET = 15;
+const MAX_STAGE_SHADOW_LIGHTS = 1;
 const FORCE_SMOOTH_NORMALS = true;
 const DEFAULT_STAGE_LIGHT_STRENGTH = 1.6;
 const DEFAULT_THEME_LIGHT = false;
@@ -41,6 +44,12 @@ renderer.toneMappingExposure = 1.25;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
+
+const maxTextureUnits = renderer.capabilities.maxTextures;
+if (maxTextureUnits <= TARGET_TEXTURE_UNIT_BUDGET + 1) {
+  // Trim material texture usage so lighting + shadows stay below the GPU cap.
+  keepPbrTextures = false;
+}
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0f14);
@@ -303,7 +312,8 @@ const computeLightEmitter = (root: THREE.Object3D) => {
 const createStageLight = (
   name: string,
   baseIntensity: number,
-  template: THREE.Object3D | null
+  template: THREE.Object3D | null,
+  castShadow: boolean
 ) => {
   const group = new THREE.Group();
   group.name = name;
@@ -330,9 +340,11 @@ const createStageLight = (
   const emitter = modelRoot ? computeLightEmitter(modelRoot) : null;
 
   const spot = new THREE.SpotLight(0xffffff, 0, 40, Math.PI / 7, 0.45, 1.0);
-  spot.castShadow = true;
-  spot.shadow.mapSize.set(1024, 1024);
-  spot.shadow.bias = -0.0002;
+  spot.castShadow = castShadow;
+  if (castShadow) {
+    spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.bias = -0.0002;
+  }
 
   const target = new THREE.Object3D();
   group.add(spot, target);
@@ -414,7 +426,8 @@ const setupStageLights = () => {
     const light = createStageLight(
       `StageLight_${i + 1}`,
       stageLightIntensities[i],
-      stageLightTemplate
+      stageLightTemplate,
+      i < MAX_STAGE_SHADOW_LIGHTS
     );
     setStageLightOn(light, true);
   }
@@ -487,7 +500,7 @@ const sanitizeMaterial = (material: THREE.Material) => {
   if (!(mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
     return;
   }
-  if (!KEEP_PBR_TEXTURES) {
+  if (!keepPbrTextures) {
     // Keep only base color map to stay within low texture unit limits.
     mat.normalMap = null;
     mat.roughnessMap = null;
