@@ -29,6 +29,8 @@ const KEEP_PBR_TEXTURES = true;
 const FORCE_SMOOTH_NORMALS = true;
 const DEFAULT_STAGE_LIGHT_STRENGTH = 1.6;
 const DEFAULT_THEME_LIGHT = false;
+const GROUND_LEVEL = 0;
+const CAMERA_GROUND_CLEARANCE = 0.08;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -67,6 +69,8 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = !prefersReducedMotion;
 controls.dampingFactor = 0.08;
 controls.screenSpacePanning = true;
+// Prevent orbiting below the horizon around the current target.
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.update();
 
 type TransformControlsLike = THREE.Object3D & {
@@ -130,7 +134,7 @@ const groundMaterial = new THREE.MeshStandardMaterial({
 });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = 0;
+ground.position.y = GROUND_LEVEL;
 ground.receiveShadow = true;
 scene.add(ground);
 
@@ -434,7 +438,7 @@ const clippingTool = new ClippingTool(renderer);
 const explodeTool = new ExplodeTool();
 const moveTool = new MoveTool(camera, renderer.domElement);
 moveTool.setTarget(modelPivot);
-moveTool.setGroundHeight(0);
+moveTool.setGroundHeight(GROUND_LEVEL);
 
 let mode: Mode = "navigate";
 let modelBounds: THREE.Box3 | null = null;
@@ -590,6 +594,25 @@ const updateClipRange = (axis: ClipAxis) => {
   ui.setClipRange(min, max, value);
   clippingTool.setAxis(axis);
   clippingTool.setValue(value);
+};
+
+const enforceCameraGroundLock = () => {
+  const minY = GROUND_LEVEL + CAMERA_GROUND_CLEARANCE;
+  let changed = false;
+
+  if (controls.target.y < GROUND_LEVEL) {
+    controls.target.y = GROUND_LEVEL;
+    changed = true;
+  }
+
+  if (camera.position.y < minY) {
+    camera.position.y = minY;
+    changed = true;
+  }
+
+  if (changed) {
+    controls.update();
+  }
 };
 
 const resetAppState = () => {
@@ -1252,6 +1275,7 @@ const tick = () => {
   requestAnimationFrame(tick);
   updateTransformTarget();
   controls.update();
+  enforceCameraGroundLock();
   if (modelReady) {
     if (!modelPivotLast.equals(modelPivot.position)) {
       stageLightRig.position.copy(modelPivot.position);
