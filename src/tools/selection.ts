@@ -47,15 +47,23 @@ export const resolveMetadata = (name: string): Metadata => {
   const key = name.toLowerCase();
   let category: Category = "Other";
 
-  if (/(wheel|tire|rim)/.test(key)) {
+  if (/(llanta|freno|brake|rueda|wheel|tire|rim)/.test(key)) {
     category = "Wheels";
-  } else if (/(glass|window|windshield|screen)/.test(key)) {
+  } else if (/(cristal|vidrio|glass|window|windshield|screen)/.test(key)) {
     category = "Glass";
-  } else if (/(light|lamp|head|tail)/.test(key)) {
+  } else if (/(faro|faros|light|lamp|head|tail)/.test(key)) {
     category = "Lights";
-  } else if (/(seat|interior|dash|console|steer)/.test(key)) {
+  } else if (
+    /(^int[_-]|_int_|interior|cockpit|salpicadero|asiento|reposabrazos|hmi|suelo|techo|maletero|dash|console|steer|seat)/.test(
+      key
+    )
+  ) {
     category = "Interior";
-  } else if (/(body|door|hood|bonnet|bumper|fender)/.test(key)) {
+  } else if (
+    /(^ext[_-]|_ext_|chapa|puerta|capo|hood|bonnet|bumper|fender|carroceria|parachoques|detalles|plastico|cortina)/.test(
+      key
+    )
+  ) {
     category = "Body";
   } else {
     category = "Other";

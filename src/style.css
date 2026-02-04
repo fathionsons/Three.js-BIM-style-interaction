@@ -329,6 +329,15 @@ textarea {
   margin-top: 8px;
 }
 
+.panel__credit a {
+  color: #4da3ff;
+  text-decoration: underline;
+}
+
+.panel__credit a:hover {
+  color: #86c2ff;
+}
+
 @media (max-width: 900px) {
   .panel {
     width: 100%;

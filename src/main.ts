@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { UI, type Mode, type ViewPreset } from "./ui";
 import { SelectionTool } from "./tools/selection";
 import { LayersTool } from "./tools/layers";
@@ -21,18 +22,25 @@ const prefersReducedMotion = window.matchMedia(
 
 const ui = new UI();
 
+const KEEP_PBR_TEXTURES = true;
+const FORCE_SMOOTH_NORMALS = true;
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.25;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0f14);
+
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+pmremGenerator.dispose();
 
 const textureLoader = new THREE.TextureLoader();
 const modelPivot = new THREE.Group();
@@ -88,19 +96,19 @@ const transformHelper =
 transformHelper.visible = false;
 scene.add(transformHelper);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
 scene.add(ambientLight);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
 keyLight.position.set(6, 10, 5);
 keyLight.castShadow = true;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0x8bb7ff, 0.6);
+const fillLight = new THREE.DirectionalLight(0x8bb7ff, 0.9);
 fillLight.position.set(-8, 4, 6);
 scene.add(fillLight);
 
-const rimLight = new THREE.DirectionalLight(0xffffff, 0.8);
+const rimLight = new THREE.DirectionalLight(0xffffff, 1.1);
 rimLight.position.set(-4, 8, -8);
 scene.add(rimLight);
 
@@ -187,7 +195,7 @@ const stageLights: StageLight[] = [];
 const stageLightPickables: THREE.Object3D[] = [];
 let stageLightTemplate: THREE.Object3D | null = null;
 let stageLightsReady = false;
-let stageLightStrength = 1.2;
+let stageLightStrength = 1.6;
 let activeStageLight: StageLight | null = null;
 
 ui.setLightStrength(stageLightStrength);
@@ -237,6 +245,46 @@ const createFallbackStageLight = (group: THREE.Group) => {
   return [body, lens];
 };
 
+const computeLightEmitter = (root: THREE.Object3D) => {
+  let lens: THREE.Object3D | null = null;
+  root.traverse((child) => {
+    if (lens) {
+      return;
+    }
+    const name = (child.name || "").toLowerCase();
+    if (name.includes("lens")) {
+      lens = child;
+    }
+  });
+
+  const bounds = new THREE.Box3().setFromObject(root);
+  const center = bounds.getCenter(new THREE.Vector3());
+
+  if (lens) {
+    const lensWorld = new THREE.Vector3();
+    lens.getWorldPosition(lensWorld);
+    const dir = lensWorld.clone().sub(center);
+    if (dir.lengthSq() < 1e-6) {
+      lens.getWorldDirection(dir);
+    }
+    if (dir.lengthSq() < 1e-6) {
+      dir.set(0, 0, -1);
+    }
+    dir.normalize();
+    return { position: lensWorld, direction: dir };
+  }
+
+  const frontZ =
+    Math.abs(bounds.min.z - center.z) > Math.abs(bounds.max.z - center.z)
+      ? bounds.min.z
+      : bounds.max.z;
+  const direction = frontZ < center.z ? -1 : 1;
+  return {
+    position: new THREE.Vector3(center.x, center.y, frontZ),
+    direction: new THREE.Vector3(0, 0, direction),
+  };
+};
+
 const createStageLight = (
   name: string,
   baseIntensity: number,
@@ -246,6 +294,7 @@ const createStageLight = (
   group.name = name;
 
   let modelObjects: THREE.Object3D[] = [];
+  let modelRoot: THREE.Object3D | null = null;
   if (template) {
     const model = template.clone(true);
     model.traverse((child) => {
@@ -257,20 +306,36 @@ const createStageLight = (
     });
     group.add(model);
     modelObjects = [model];
+    modelRoot = model;
   } else {
     modelObjects = createFallbackStageLight(group);
+    modelRoot = group;
   }
+
+  const emitter = modelRoot ? computeLightEmitter(modelRoot) : null;
 
   const spot = new THREE.SpotLight(0xffffff, 0, 40, Math.PI / 7, 0.45, 1.0);
   spot.castShadow = true;
   spot.shadow.mapSize.set(1024, 1024);
   spot.shadow.bias = -0.0002;
-  spot.position.set(0, 0, 0);
 
   const target = new THREE.Object3D();
-  target.position.set(0, 0, -1);
   group.add(spot, target);
   spot.target = target;
+
+  if (emitter) {
+    const localPosition = emitter.position.clone();
+    const localTarget = emitter.position
+      .clone()
+      .add(emitter.direction.clone().multiplyScalar(1));
+    group.worldToLocal(localPosition);
+    group.worldToLocal(localTarget);
+    spot.position.copy(localPosition);
+    target.position.copy(localTarget);
+  } else {
+    spot.position.set(0, 0, 0);
+    target.position.set(0, 0, -1);
+  }
 
   const stageLight: StageLight = {
     group,
@@ -398,49 +463,51 @@ const sanitizeMaterial = (material: THREE.Material) => {
   if (!(mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
     return;
   }
-  // Keep only base color map to stay within low texture unit limits.
-  mat.normalMap = null;
-  mat.roughnessMap = null;
-  mat.metalnessMap = null;
-  mat.aoMap = null;
-  mat.lightMap = null;
-  mat.emissiveMap = null;
-  const physical = mat as THREE.MeshPhysicalMaterial;
-  if ("clearcoatMap" in physical) {
-    physical.clearcoatMap = null;
-  }
-  if ("clearcoatNormalMap" in physical) {
-    physical.clearcoatNormalMap = null;
-  }
-  if ("clearcoatRoughnessMap" in physical) {
-    physical.clearcoatRoughnessMap = null;
-  }
-  if ("sheenColorMap" in physical) {
-    physical.sheenColorMap = null;
-  }
-  if ("sheenRoughnessMap" in physical) {
-    physical.sheenRoughnessMap = null;
-  }
-  if ("iridescenceMap" in physical) {
-    physical.iridescenceMap = null;
-  }
-  if ("iridescenceThicknessMap" in physical) {
-    physical.iridescenceThicknessMap = null;
-  }
-  if ("specularIntensityMap" in physical) {
-    physical.specularIntensityMap = null;
-  }
-  if ("specularColorMap" in physical) {
-    physical.specularColorMap = null;
-  }
-  if ("transmissionMap" in physical) {
-    physical.transmissionMap = null;
-  }
-  if ("thicknessMap" in physical) {
-    physical.thicknessMap = null;
-  }
-  if ("envMap" in physical) {
-    physical.envMap = null;
+  if (!KEEP_PBR_TEXTURES) {
+    // Keep only base color map to stay within low texture unit limits.
+    mat.normalMap = null;
+    mat.roughnessMap = null;
+    mat.metalnessMap = null;
+    mat.aoMap = null;
+    mat.lightMap = null;
+    mat.emissiveMap = null;
+    const physical = mat as THREE.MeshPhysicalMaterial;
+    if ("clearcoatMap" in physical) {
+      physical.clearcoatMap = null;
+    }
+    if ("clearcoatNormalMap" in physical) {
+      physical.clearcoatNormalMap = null;
+    }
+    if ("clearcoatRoughnessMap" in physical) {
+      physical.clearcoatRoughnessMap = null;
+    }
+    if ("sheenColorMap" in physical) {
+      physical.sheenColorMap = null;
+    }
+    if ("sheenRoughnessMap" in physical) {
+      physical.sheenRoughnessMap = null;
+    }
+    if ("iridescenceMap" in physical) {
+      physical.iridescenceMap = null;
+    }
+    if ("iridescenceThicknessMap" in physical) {
+      physical.iridescenceThicknessMap = null;
+    }
+    if ("specularIntensityMap" in physical) {
+      physical.specularIntensityMap = null;
+    }
+    if ("specularColorMap" in physical) {
+      physical.specularColorMap = null;
+    }
+    if ("transmissionMap" in physical) {
+      physical.transmissionMap = null;
+    }
+    if ("thicknessMap" in physical) {
+      physical.thicknessMap = null;
+    }
+    if ("envMap" in physical) {
+      physical.envMap = null;
+    }
   }
   mat.needsUpdate = true;
 };
@@ -892,6 +959,10 @@ loader.load(
 
         const geometry = mesh.geometry;
         if (geometry) {
+          if (FORCE_SMOOTH_NORMALS) {
+            geometry.computeVertexNormals();
+            geometry.normalizeNormals();
+          }
           if (geometry.index) {
             totalTriangles += geometry.index.count / 3;
           } else {
