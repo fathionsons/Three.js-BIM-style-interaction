@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Seat Ibiza 2022 (Three.js)</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div class="hud" id="hud">
+      <div class="hud__title">Seat Ibiza 2022 (Three.js)</div>
+      <div class="hud__subtitle">
+        BIM-style inspection demo: select &bull; properties &bull; layers &bull; issues &bull; measure &bull; clip
+      </div>
+      <div class="hud__status">
+        <span id="loading">Loading model...</span>
+      </div>
+      <div class="hud__instruction" id="instruction">Navigate: orbit with drag, zoom with scroll.</div>
+      <button class="theme-toggle" id="theme-toggle" aria-pressed="false">
+        Light Mode
+        <span class="theme-indicator" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <aside class="panel" id="panel">
+      <section class="panel__section">
+        <h3>View</h3>
+        <div class="button-row">
+          <button data-view="front">Front</button>
+          <button data-view="side">Side</button>
+          <button data-view="rear">Rear</button>
+          <button data-view="top">Top</button>
+          <button data-view="interior">Interior</button>
+          <button data-view="reset">Reset</button>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h3>Lighting</h3>
+        <label class="field field--stack">
+          <span>Stage light strength</span>
+          <input id="light-strength" type="range" min="0" max="3" step="0.05" value="1.2" />
+          <span class="range-value" id="light-strength-value">1.2x</span>
+        </label>
+      </section>
+
+      <section class="panel__section">
+        <h3>Selection</h3>
+        <div class="field"><span>Name</span><span id="sel-name">None</span></div>
+        <div class="field"><span>Category</span><span id="sel-category">-</span></div>
+        <div class="field"><span>Status</span><span id="sel-status">-</span></div>
+        <div class="field"><span>Material</span><span id="sel-material">-</span></div>
+        <div class="field"><span>Triangles</span><span id="sel-triangles">-</span></div>
+        <label class="field field--stack">
+          <span>Notes</span>
+          <textarea id="sel-notes" readonly rows="3" placeholder="No notes"></textarea>
+        </label>
+      </section>
+
+      <section class="panel__section">
+        <h3>Layers</h3>
+        <label class="checkbox"><input type="checkbox" data-layer="Body" checked /> Body</label>
+        <label class="checkbox"><input type="checkbox" data-layer="Glass" checked /> Glass</label>
+        <label class="checkbox"><input type="checkbox" data-layer="Wheels" checked /> Wheels</label>
+        <label class="checkbox"><input type="checkbox" data-layer="Interior" checked /> Interior</label>
+        <label class="checkbox"><input type="checkbox" data-layer="Lights" checked /> Lights</label>
+        <label class="checkbox"><input type="checkbox" data-layer="Other" checked /> Other</label>
+      </section>
+
+      <section class="panel__section">
+        <h3>Tools</h3>
+        <div class="button-row">
+          <button data-mode="navigate" class="is-active">Navigate</button>
+          <button data-mode="select">Select</button>
+          <button data-mode="issue">Issue</button>
+          <button data-mode="measure">Measure</button>
+          <button data-mode="clip">Clip</button>
+          <button id="model-rotate" class="ghost">Rotate Model</button>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h3>Issues</h3>
+        <div id="issue-form" class="issue-form is-hidden">
+          <label>
+            Title
+            <input id="issue-title" type="text" placeholder="Issue title" />
+          </label>
+          <label>
+            Severity
+            <select id="issue-severity">
+              <option value="Low">Low</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="High">High</option>
+            </select>
+          </label>
+          <label>
+            Notes
+            <textarea id="issue-notes" rows="3" placeholder="Add notes"></textarea>
+          </label>
+          <div class="issue-form__actions">
+            <button id="issue-save">Save Issue</button>
+            <button id="issue-cancel" class="ghost">Cancel</button>
+          </div>
+          <div class="issue-form__message" id="issue-message"></div>
+        </div>
+        <div id="issues-list" class="issues"></div>
+        <div class="button-row">
+          <button id="issues-export">Export JSON</button>
+          <button id="issues-clear" class="ghost">Clear Issues</button>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h3>Measure</h3>
+        <div class="hint" id="measure-hint">Click two points to measure.</div>
+        <div class="field"><span>Distance</span><span id="measure-value">-</span></div>
+        <button id="measure-clear" class="ghost">Clear measurement</button>
+      </section>
+
+      <section class="panel__section">
+        <h3>Clip</h3>
+        <div class="axis-row">
+          <label class="radio"><input type="radio" name="clip-axis" value="x" checked /> X</label>
+          <label class="radio"><input type="radio" name="clip-axis" value="y" /> Y</label>
+          <label class="radio"><input type="radio" name="clip-axis" value="z" /> Z</label>
+        </div>
+        <input id="clip-slider" type="range" min="-1" max="1" step="0.01" value="0" />
+        <div class="button-row">
+          <button id="clip-disable" class="ghost">Disable clipping</button>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h3>Performance</h3>
+        <div class="field"><span>FPS</span><span id="fps">-</span></div>
+        <div class="field"><span>Total triangles</span><span id="triangles">-</span></div>
+      </section>
+
+      <div class="panel__credit">
+        Car model Credit: Ddiaz Design link: https://skfb.ly/ptVUo
+        Spotlight model Credit: Mike Rowley Link : https://skfb.ly/M6TS
+      </div>
+    </aside>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

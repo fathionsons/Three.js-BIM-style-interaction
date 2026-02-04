@@ -1,0 +1,343 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap");
+
+:root {
+  color-scheme: dark;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  --bg: #0b0f14;
+  --hud-bg: rgba(10, 12, 18, 0.75);
+  --panel-bg: rgba(12, 16, 22, 0.92);
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e6edf5;
+  --text-strong: #f2f5f9;
+  --text-muted: rgba(226, 233, 244, 0.7);
+  --text-subtle: rgba(226, 233, 244, 0.6);
+  --accent: rgba(120, 180, 255, 0.25);
+  --accent-border: rgba(120, 180, 255, 0.4);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: rgba(255, 255, 255, 0.1);
+  --issue-bg: rgba(255, 255, 255, 0.03);
+  --status: #9ee7b4;
+}
+
+body[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --hud-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg: rgba(250, 251, 253, 0.96);
+  --surface: rgba(20, 30, 40, 0.06);
+  --surface-hover: rgba(20, 30, 40, 0.12);
+  --border: rgba(20, 30, 40, 0.12);
+  --text: #18222f;
+  --text-strong: #0e1621;
+  --text-muted: rgba(24, 34, 47, 0.7);
+  --text-subtle: rgba(24, 34, 47, 0.55);
+  --accent: rgba(45, 119, 216, 0.2);
+  --accent-border: rgba(45, 119, 216, 0.4);
+  --input-bg: rgba(20, 30, 40, 0.04);
+  --input-border: rgba(20, 30, 40, 0.12);
+  --issue-bg: rgba(20, 30, 40, 0.04);
+  --status: #1b8b4a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+canvas {
+  display: block;
+}
+
+.hud {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  max-width: 420px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--hud-bg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.hud__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.hud__subtitle {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.hud__status {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: var(--status);
+}
+
+.hud__instruction {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+.theme-toggle {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.theme-toggle .theme-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d94c4c;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15) inset;
+}
+
+body[data-theme="light"] .theme-toggle .theme-indicator {
+  background: #2ebf6d;
+}
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  padding: 20px 18px 24px;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.panel__section {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: var(--text-strong);
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+button:hover {
+  background: var(--surface-hover);
+}
+
+button.is-active {
+  background: var(--accent);
+  border-color: var(--accent-border);
+}
+
+button.ghost {
+  background: transparent;
+}
+
+.field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.field--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.range-value {
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+  margin-top: 4px;
+}
+
+.field span:first-child {
+  color: var(--text-subtle);
+}
+
+textarea,
+input,
+select {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 0.78rem;
+}
+
+textarea {
+  resize: none;
+}
+
+.checkbox,
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.issue-form {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.issue-form__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.issue-form__message {
+  font-size: 0.75rem;
+  color: #f7b7b7;
+}
+
+.issue-form.is-hidden {
+  display: none;
+}
+
+.issues {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.issue-card {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--issue-bg);
+}
+
+.issue-card img {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.issue-card__title {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.issue-card__meta {
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+}
+
+.severity-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  margin-top: 4px;
+}
+
+.severity-low {
+  background: rgba(130, 220, 160, 0.2);
+  color: #9ee7b4;
+}
+
+.severity-medium {
+  background: rgba(255, 214, 138, 0.2);
+  color: #ffd68a;
+}
+
+.severity-high {
+  background: rgba(255, 130, 130, 0.2);
+  color: #ff9c9c;
+}
+
+.axis-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.hint {
+  font-size: 0.76rem;
+  color: var(--text-subtle);
+  margin-bottom: 8px;
+}
+
+.panel__credit {
+  font-size: 0.72rem;
+  color: var(--text-subtle);
+  margin-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .panel {
+    width: 100%;
+    height: 50vh;
+    bottom: 0;
+    top: auto;
+  }
+
+  .hud {
+    max-width: calc(100% - 40px);
+  }
+}
