@@ -99,4 +99,4 @@ npm run dev
 
 
 ![Description](public/assets/seat.JPG)
-![Description](public/assets/1_m0zrCLd2wY29-jHaxYsgA.png)
+(public/assets/1_m0zrCLd2wY29-jHaxYsgA.png)
