@@ -1,6 +1,6 @@
-# Seat Ibiza 2022 – Interactive 3D Inspection Demo
+# Seat Ibiza 2022 ï¿½ Interactive 3D Inspection Demo
 
-A production-style Three.js viewer inspired by BIM/Dalux workflows. This project is a portfolio-quality demo that combines BIM-like inspection tools with interactive lighting and scene controls for a Seat Ibiza 2022 GLB model.
+A production-style Three.js viewer inspired by BIM workflows. This project is a portfolio-quality demo that combines BIM-like inspection tools with interactive lighting and scene controls for a Seat Ibiza 2022 GLB model.
 
 ## What This Demo Includes
 
@@ -18,7 +18,7 @@ A production-style Three.js viewer inspired by BIM/Dalux workflows. This project
 
 - **Scene extras**
   - OrbitControls + auto-fit camera
-  - Ground plane and decals (logo + “Fathi” name)
+  - Ground plane and decals (logo + ï¿½Fathiï¿½ name)
   - Dark / Light mode toggle
 
 ## Setup
@@ -96,3 +96,7 @@ npm run dev
 - Issues are stored in `localStorage` and exported as JSON (thumbnails stored separately in localStorage).
 - Layers visibility is persisted in `localStorage`.
 - The car is snapped to ground using filtered mesh bounds to avoid floating.
+
+
+![Description](public/assets/seat.JPG)
+![Description](public/assets/1_m0zrCLd2wY29-jHaxYsgA.png)
