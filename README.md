@@ -136,3 +136,5 @@ npm run preview
 
 - Car model: Ddiaz Design - https://skfb.ly/ptVUo
 - Spotlight model: Mike Rowley - https://skfb.ly/M6TS
+- <img width="1899" height="895" alt="image" src="https://github.com/user-attachments/assets/943637f2-561d-422e-8306-a727f3215ac4" />
+
